@@ -108,6 +108,7 @@ public class TestZookeeperFederationStateStore extends FederationStateStoreBaseT
   @After
   public void after() throws Exception {
     super.after();
+
     curatorFramework.close();
     try {
       curatorTestingServer.stop();
@@ -117,7 +118,8 @@ public class TestZookeeperFederationStateStore extends FederationStateStoreBaseT
 
   @Override
   protected FederationStateStore createStateStore() {
-    super.setConf(getConf());
+    Configuration conf = new Configuration();
+    super.setConf(conf);
     return new ZookeeperFederationStateStore();
   }
 

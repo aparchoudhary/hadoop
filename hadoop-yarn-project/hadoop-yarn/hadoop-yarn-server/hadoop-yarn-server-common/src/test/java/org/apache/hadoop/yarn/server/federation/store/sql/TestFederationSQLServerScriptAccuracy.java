@@ -50,7 +50,7 @@ public class TestFederationSQLServerScriptAccuracy extends FederationSQLAccuracy
     // get a list of tables
     List<String> tables = federationStateStore.getTables();
     for (String table : tables) {
-      federationStateStore.getConn().prepareStatement(table).execute();
+      federationStateStore.getConnection().prepareStatement(table).execute();
     }
 
     LOG.info("FederationStateStore create {} tables.", tables.size());

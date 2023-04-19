@@ -325,7 +325,11 @@ public class HSQLDBFederationStateStore extends SQLFederationStateStore {
     try {
       conf.setInt(YarnConfiguration.FEDERATION_STATESTORE_MAX_APPLICATIONS, 10);
       super.init(conf);
-      conn = super.getConn();
+    } catch (YarnException e1) {
+      LOG.error("ERROR: failed to init HSQLDB " + e1.getMessage());
+    }
+    try {
+      conn = getConnection();
 
       LOG.info("Database Init: Start");
 
@@ -365,8 +369,12 @@ public class HSQLDBFederationStateStore extends SQLFederationStateStore {
   public void initConnection(Configuration conf) {
     try {
       super.init(conf);
-      conn = super.getConn();
     } catch (YarnException e1) {
+      LOG.error("ERROR: failed to init conf {}", e1.getMessage());
+    }
+    try {
+      conn = super.getConnection();
+    } catch (SQLException e1) {
       LOG.error("ERROR: failed open connection to HSQLDB DB {}.", e1.getMessage());
     }
   }

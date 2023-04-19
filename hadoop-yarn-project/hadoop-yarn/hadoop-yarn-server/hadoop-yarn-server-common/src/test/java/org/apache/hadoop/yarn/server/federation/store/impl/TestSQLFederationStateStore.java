@@ -62,6 +62,8 @@ import static org.apache.hadoop.yarn.server.federation.store.impl.HSQLDBFederati
 import static org.apache.hadoop.yarn.server.federation.store.impl.HSQLDBFederationStateStore.SP_UPDATERESERVATIONHOMESUBCLUSTER2;
 import static org.apache.hadoop.yarn.server.federation.store.impl.HSQLDBFederationStateStore.SP_DROP_DELETERESERVATIONHOMESUBCLUSTER;
 import static org.apache.hadoop.yarn.server.federation.store.impl.HSQLDBFederationStateStore.SP_DELETERESERVATIONHOMESUBCLUSTER2;
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
+import org.apache.hadoop.yarn.server.federation.store.FederationStateStore;
 
 /**
  * Unit tests for SQLFederationStateStore.
@@ -129,7 +131,8 @@ public class TestSQLFederationStateStore extends FederationStateStoreBaseTest {
       SQLFederationStateStore sqlFederationStateStore, String procedure,
       String reservationId, String subHomeClusterId) throws SQLException, YarnException {
     // procedure call parameter preparation
-    CallableStatement cstmt = sqlFederationStateStore.getCallableStatement(procedure);
+    Connection conn = sqlFederationStateStore.getConnection();
+    CallableStatement cstmt = conn.prepareCall(procedure);
     cstmt.setString("reservationId_IN", reservationId);
     cstmt.setString("homeSubCluster_IN", subHomeClusterId);
     cstmt.registerOutParameter("storedHomeSubCluster_OUT", java.sql.Types.VARCHAR);
@@ -143,7 +146,7 @@ public class TestSQLFederationStateStore extends FederationStateStoreBaseTest {
     int dbRowCount = cstmt.getInt("rowCount_OUT");
 
     // return cstmt to pool
-    FederationStateStoreUtils.returnToPool(LOG, cstmt);
+    FederationStateStoreUtils.returnToPool(LOG, cstmt, conn);
 
     return new ReservationHomeSC(reservationId, dbStoredHomeSubCluster, dbRowCount);
   }
@@ -153,7 +156,8 @@ public class TestSQLFederationStateStore extends FederationStateStoreBaseTest {
       String reservationId) throws SQLException, YarnException {
 
     // procedure call parameter preparation
-    CallableStatement cstmt = sqlFederationStateStore.getCallableStatement(procedure);
+    Connection conn = sqlFederationStateStore.getConnection();
+    CallableStatement cstmt = conn.prepareCall(procedure);
     cstmt.setString("reservationId_IN", reservationId.toString());
     cstmt.registerOutParameter("homeSubCluster_OUT", java.sql.Types.VARCHAR);
 
@@ -164,7 +168,7 @@ public class TestSQLFederationStateStore extends FederationStateStoreBaseTest {
     String dBSubClusterHomeId = cstmt.getString("homeSubCluster_OUT");
 
     // return cstmt to pool
-    FederationStateStoreUtils.returnToPool(LOG, cstmt);
+    FederationStateStoreUtils.returnToPool(LOG, cstmt, conn);
 
     // returns the ReservationHomeSubCluster object
     return new ReservationHomeSC(reservationId, dBSubClusterHomeId, 0);
@@ -172,12 +176,13 @@ public class TestSQLFederationStateStore extends FederationStateStoreBaseTest {
 
   private List<ReservationHomeSC> getReservationsHomeSubCluster(
       SQLFederationStateStore sqlFederationStateStore, String procedure)
-      throws SQLException, IOException, YarnException {
+      throws SQLException, YarnException {
 
     List<ReservationHomeSC> results = new ArrayList<>();
 
     // procedure call parameter preparation
-    CallableStatement cstmt = sqlFederationStateStore.getCallableStatement(procedure);
+    Connection conn = sqlFederationStateStore.getConnection();
+    CallableStatement cstmt = conn.prepareCall(procedure);
 
     // execute procedure
     ResultSet rs = cstmt.executeQuery();
@@ -191,7 +196,7 @@ public class TestSQLFederationStateStore extends FederationStateStoreBaseTest {
     }
 
     // return cstmt to pool
-    FederationStateStoreUtils.returnToPool(LOG, cstmt);
+    FederationStateStoreUtils.returnToPool(LOG, cstmt, conn);
 
     // return ReservationHomeSubCluster List
     return results;
@@ -200,10 +205,11 @@ public class TestSQLFederationStateStore extends FederationStateStoreBaseTest {
   private ReservationHomeSC updateReservationHomeSubCluster(
       SQLFederationStateStore sqlFederationStateStore, String procedure,
       String reservationId, String subHomeClusterId)
-      throws SQLException, IOException {
+      throws SQLException, YarnException {
 
     // procedure call parameter preparation
-    CallableStatement cstmt = sqlFederationStateStore.getCallableStatement(procedure);
+    Connection conn = sqlFederationStateStore.getConnection();
+    CallableStatement cstmt = conn.prepareCall(procedure);
 
     // 1）IN reservationId_IN varchar(128)
     cstmt.setString("reservationId_IN", reservationId);
@@ -218,15 +224,19 @@ public class TestSQLFederationStateStore extends FederationStateStoreBaseTest {
     // get rowcount
     int rowCount = cstmt.getInt("rowCount_OUT");
 
+    // return cstmt to pool
+    FederationStateStoreUtils.returnToPool(LOG, cstmt, conn);
+
     // returns the ReservationHomeSubCluster object
     return new ReservationHomeSC(reservationId, subHomeClusterId, rowCount);
   }
 
   private ReservationHomeSC deleteReservationHomeSubCluster(
       SQLFederationStateStore sqlFederationStateStore, String procedure,
-      String reservationId) throws SQLException {
+      String reservationId) throws SQLException, YarnException {
     // procedure call parameter preparation
-    CallableStatement cstmt = sqlFederationStateStore.getCallableStatement(procedure);
+    Connection conn = sqlFederationStateStore.getConnection();
+    CallableStatement cstmt = conn.prepareCall(procedure);
 
     // Set the parameters for the stored procedure
     // 1）IN reservationId_IN varchar(128)
@@ -239,6 +249,9 @@ public class TestSQLFederationStateStore extends FederationStateStoreBaseTest {
 
     // get rowcount
     int rowCount = cstmt.getInt("rowCount_OUT");
+
+    // return cstmt to pool
+    FederationStateStoreUtils.returnToPool(LOG, cstmt, conn);
 
     // returns the ReservationHomeSubCluster object
     return new ReservationHomeSC(reservationId, "-", rowCount);
@@ -451,7 +464,7 @@ public class TestSQLFederationStateStore extends FederationStateStoreBaseTest {
 
     SQLFederationStateStore sqlFederationStateStore = (SQLFederationStateStore) stateStore;
 
-    Connection conn =  sqlFederationStateStore.getConn();
+    Connection conn =  sqlFederationStateStore.getConnection();
     conn.prepareStatement(SP_DROP_ADDRESERVATIONHOMESUBCLUSTER).execute();
     conn.prepareStatement(SP_ADDRESERVATIONHOMESUBCLUSTER2).execute();
 
@@ -488,7 +501,7 @@ public class TestSQLFederationStateStore extends FederationStateStoreBaseTest {
 
     SQLFederationStateStore sqlFederationStateStore = (SQLFederationStateStore) stateStore;
 
-    Connection conn =  sqlFederationStateStore.getConn();
+    Connection conn =  sqlFederationStateStore.getConnection();
     conn.prepareStatement(SP_DROP_UPDATERESERVATIONHOMESUBCLUSTER).execute();
     conn.prepareStatement(SP_UPDATERESERVATIONHOMESUBCLUSTER2).execute();
 
@@ -534,7 +547,7 @@ public class TestSQLFederationStateStore extends FederationStateStoreBaseTest {
 
     SQLFederationStateStore sqlFederationStateStore = (SQLFederationStateStore) stateStore;
 
-    Connection conn =  sqlFederationStateStore.getConn();
+    Connection conn =  sqlFederationStateStore.getConnection();
     conn.prepareStatement(SP_DROP_DELETERESERVATIONHOMESUBCLUSTER).execute();
     conn.prepareStatement(SP_DELETERESERVATIONHOMESUBCLUSTER2).execute();
 

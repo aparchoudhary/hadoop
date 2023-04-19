@@ -1,20 +1,553 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
 <!--
-  Licensed under the Apache License, Version 2.0 (the "License");
-  you may not use this file except in compliance with the License.
-  You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-  Unless required by applicable law or agreed to in writing, software
-  distributed under the License is distributed on an "AS IS" BASIS,
-  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-  See the License for the specific language governing permissions and
-  limitations under the License. See accompanying LICENSE file.
+#
+# AUTO-GENERATED, please try not to change it
+# Time:  2021-12-14_05:52:53UTC
+# Build: https://ltx1-jenkins.grid.linkedin.com:8443/job/hadoop-sre/job/grid-conf_batch-build/57/
+# JIRA:  GRID-89384
+#
 -->
-
-<!-- Put site-specific property overrides in this file. -->
-
 <configuration>
+
+
+  <property>
+    <name>fs.defaultFS</name>
+    <value>hdfs://ltx1-holdem</value>
+  </property>
+  <!-- GRID-7217: changing the expensive DU interval to 12 hours and also adding the jitter setting -->
+  <property>
+    <name>fs.du.interval</name>
+    <value>43200000</value>
+  </property>
+
+  <property>
+    <name>fs.getspaceused.jitterMillis</name>
+    <value>21600000</value>
+  </property>
+  <!-- Security -->
+  <property>
+    <name>hadoop.security.authentication</name>
+    <value>kerberos</value>
+  </property>
+  <property>
+    <name>hadoop.security.authorization</name>
+    <value>true</value>
+  </property>
+  <property>
+    <name>hadoop.security.auth_to_local</name>
+    <value>
+      RULE:[1:$1@$0](.*@LINKEDIN.BIZ)s/@.*//
+      RULE:[2:$1@$0](.*@LINKEDIN.BIZ)s/@.*//
+      RULE:[2:$1/$2@$0](.*/hdfs@GRID.LINKEDIN.COM)s/.*/hdfs/
+      RULE:[2:$1/$2@$0](.*/yarn@GRID.LINKEDIN.COM)s/.*/yarn/
+      DEFAULT
+    </value>
+  </property>
+
+  <!-- HTTP web-consoles Authentication -->
+  <property>
+    <name>hadoop.http.filter.initializers</name>
+    <value>org.apache.hadoop.security.AuthenticationFilterInitializer</value>
+  </property>
+  <property>
+    <name>hadoop.http.authentication.type</name>
+    <value>kerberos</value>
+  </property>
+  <property>
+    <name>hadoop.http.authentication.kerberos.keytab</name>
+    <value>/export/apps/hadoop/keytabs/${user.name}.keytab</value>
+  </property>
+  <property>
+    <name>hadoop.http.authentication.signature.secret.file</name>
+    <value>/etc/hadoop/http-auth-signature-secret</value>
+  </property>
+
+  <!-- LIHADOOP-16487 -->
+  <property>
+    <name>hadoop.http.authentication.kerberos.principal</name>
+    <value>*</value>
+  </property>
+
+
+  <!-- HADOOP-12252 -->
+  <property>
+    <name>hadoop.security.groups.cache.secs</name>
+    <value>1800</value>
+  </property>
+
+  <!-- BEGIN HTTPS for WebHDFS -->
+  <property>
+    <name>hadoop.ssl.require.client.cert</name>
+    <value>false</value>
+  </property>
+
+  <property>
+    <name>hadoop.ssl.hostname.verifier</name>
+    <value>DEFAULT</value>
+  </property>
+
+  <property>
+    <name>hadoop.ssl.keystores.factory.class</name>
+    <value>org.apache.hadoop.security.ssl.FileBasedKeyStoresFactory</value>
+  </property>
+
+  <property>
+    <name>hadoop.ssl.server.conf</name>
+    <value>ssl-server.xml</value>
+  </property>
+
+  <!-- END HTTPS for WebHDFS -->
+
+  <!-- LIHADOOP-13960 -->
+  <property>
+    <name>ipc.client.fallback-to-simple-auth-allowed</name>
+    <value>true</value>
+  </property>
+
+  <property>
+    <name>hadoop.security.token.service.use_ip</name>
+    <value>false</value>
+    <description>Controls whether tokens always use IP addresses.  DNS changes
+      will not be detected if this option is enabled.  Existing client connections
+      that break will always reconnect to the IP of the original host.  New clients
+      will connect to the host's new IP but fail to locate a token.  Disabling
+      this option will allow existing and new clients to detect an IP change and
+      continue to locate the new host's token.
+    </description>
+  </property>
+  <property>
+    <name>hadoop.tmp.dir</name>
+    <value>/grid/a/tmp/hadoop-${user.name}</value>
+    <final>true</final>
+  </property>
+  <property>
+    <name>io.file.buffer.size</name>
+    <value>65536</value>
+  </property>
+  <property>
+    <name>fs.trash.interval</name>
+    <value>360</value>
+  </property>
+  <property>
+    <name>net.topology.node.switch.mapping.impl</name>
+    <value>com.linkedin.grid.hadoop.GridTopology</value>
+  </property>
+  <property>
+    <name>io.compression.codecs</name>
+    <value>org.apache.hadoop.io.compress.GzipCodec,org.apache.hadoop.io.compress.DefaultCodec,com.hadoop.compression.lzo.LzoCodec,com.hadoop.compression.lzo.LzopCodec,org.apache.hadoop.io.compress.BZip2Codec,org.apache.hadoop.io.compress.SnappyCodec</value>
+  </property>
+  <property>
+    <name>io.compression.codec.lzo.class</name>
+    <value>com.hadoop.compression.lzo.LzoCodec</value>
+  </property>
+  <property>
+    <name>io.native.lib.available</name>
+    <value>true</value>
+  </property>
+  <property>
+    <name>ipc.client.connection.maxidletime</name>
+    <value>1000</value>
+  </property>
+  <property>
+    <name>ipc.server.listen.queue.size</name>
+    <value>4096</value>
+    <description>Indicates the length of the listen queue for servers accepting client connections.</description>
+  </property>
+  <property>
+    <name>ipc.client.connect.max.retries</name>
+    <value>50</value>
+  </property>
+  <property>
+    <name>file.stream-buffer-size</name>
+    <value>16384</value>
+  </property>
+  <property>
+    <name>ipc.ping.interval</name>
+    <value>180000</value>
+  </property>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <!-- ViewFS and FailoverFS related config -->
+  <property>
+    <name>fs.viewfs.mounttable.ltx1-holdem.linkFallback</name>
+    <value>hdfs://ltx1-holdemnn01.grid.linkedin.com:9000/</value>
+  </property>
+  <property>
+    <name>fs.viewfs.mounttable.ltx1-holdemnn01.grid.linkedin.com.linkFallback</name>
+    <value>hdfs://ltx1-holdemnn01.grid.linkedin.com:9000/</value>
+  </property>
+
+  <property>
+    <name>fs.viewfs.mounttable.ltx1-holdemnn02.grid.linkedin.com.linkFallback</name>
+    <value>hdfs://ltx1-holdemnn02.grid.linkedin.com:9000/</value>
+  </property>
+
+  <property>
+    <name>fs.viewfs.mounttable.ltx1-holdemnn03.grid.linkedin.com.linkFallback</name>
+    <value>hdfs://ltx1-holdemnn03.grid.linkedin.com:9000/</value>
+  </property>
+
+  <property>
+    <name>fs.viewfs.mounttable.ltx1-holdemnn04.grid.linkedin.com.linkFallback</name>
+    <value>hdfs://ltx1-holdemnn04.grid.linkedin.com:9000/</value>
+  </property>
+
+  <property>
+    <name>fs.viewfs.mounttable.ltx1-holdemnn05.grid.linkedin.com.linkFallback</name>
+    <value>hdfs://ltx1-holdemnn05.grid.linkedin.com:9000/</value>
+  </property>
+  <!-- Rename strategy for View FS -->
+  <property>
+    <name>fs.viewfs.rename.strategy</name>
+    <value>SAME_FILESYSTEM_ACROSS_MOUNTPOINT</value>
+  </property>
+
+
+
+
+
+  <!-- /data/databases - ViewFS -->
+  <property>
+    <name>fs.viewfs.mounttable.ltx1-holdem.link./data/databases</name>
+    <value>hdfs://ltx1-holdemnn03.grid.linkedin.com:9000/data/databases</value>
+  </property>
+
+
+  <!-- /data/databases_column - ViewFS -->
+  <property>
+    <name>fs.viewfs.mounttable.ltx1-holdem.link./data/databases_column</name>
+    <value>hdfs://ltx1-holdemnn03.grid.linkedin.com:9000/data/databases_column</value>
+  </property>
+
+
+  <!-- /data/dbchanges - ViewFS -->
+  <property>
+    <name>fs.viewfs.mounttable.ltx1-holdem.link./data/dbchanges</name>
+    <value>hdfs://ltx1-holdemnn03.grid.linkedin.com:9000/data/dbchanges</value>
+  </property>
+
+
+  <!-- /data/service - ViewFS -->
+  <property>
+    <name>fs.viewfs.mounttable.ltx1-holdem.link./data/service</name>
+    <value>hdfs://ltx1-holdemnn03.grid.linkedin.com:9000/data/service</value>
+  </property>
+
+
+  <!-- /data/service_column - ViewFS -->
+  <property>
+    <name>fs.viewfs.mounttable.ltx1-holdem.link./data/service_column</name>
+    <value>hdfs://ltx1-holdemnn03.grid.linkedin.com:9000/data/service_column</value>
+  </property>
+
+
+  <!-- /data/tracking/streaming - ViewFS -->
+  <property>
+    <name>fs.viewfs.mounttable.ltx1-holdem.link./data/tracking/streaming</name>
+    <value>hdfs://ltx1-holdemnn03.grid.linkedin.com:9000/data/tracking/streaming</value>
+  </property>
+
+
+  <!-- /data/tracking/AdRealTimeBiddingRequestEvent - ViewFS -->
+  <property>
+    <name>fs.viewfs.mounttable.ltx1-holdem.link./data/tracking/AdRealTimeBiddingRequestEvent</name>
+    <value>hdfs://ltx1-holdemnn05.grid.linkedin.com:9000/data/tracking/AdRealTimeBiddingRequestEvent</value>
+  </property>
+
+
+  <!-- /data/tracking/VoyagerUserRequestEvent - ViewFS -->
+  <property>
+    <name>fs.viewfs.mounttable.ltx1-holdem.link./data/tracking/VoyagerUserRequestEvent</name>
+    <value>hdfs://ltx1-holdemnn05.grid.linkedin.com:9000/data/tracking/VoyagerUserRequestEvent</value>
+  </property>
+
+
+  <!-- /data/tracking/CommunicationScoreEvent - ViewFS -->
+  <property>
+    <name>fs.viewfs.mounttable.ltx1-holdem.link./data/tracking/CommunicationScoreEvent</name>
+    <value>hdfs://ltx1-holdemnn05.grid.linkedin.com:9000/data/tracking/CommunicationScoreEvent</value>
+  </property>
+
+
+  <!-- /jobs/kafkaetlstrm - ViewFS -->
+  <property>
+    <name>fs.viewfs.mounttable.ltx1-holdem.link./jobs/kafkaetlstrm</name>
+    <value>hdfs://ltx1-holdemnn03.grid.linkedin.com:9000/jobs/kafkaetlstrm</value>
+  </property>
+
+
+  <!-- /jobs/dbload - ViewFS -->
+  <property>
+    <name>fs.viewfs.mounttable.ltx1-holdem.link./jobs/dbload</name>
+    <value>hdfs://ltx1-holdemnn03.grid.linkedin.com:9000/jobs/dbload</value>
+  </property>
+
+
+  <!-- /jobs/kafkaetlstrmservice - ViewFS -->
+  <property>
+    <name>fs.viewfs.mounttable.ltx1-holdem.link./jobs/kafkaetlstrmservice</name>
+    <value>hdfs://ltx1-holdemnn03.grid.linkedin.com:9000/jobs/kafkaetlstrmservice</value>
+  </property>
+
+
+  <!-- /jobs/metrics - ViewFS -->
+  <property>
+    <name>fs.viewfs.mounttable.ltx1-holdem.link./jobs/metrics</name>
+    <value>hdfs://ltx1-holdemnn04.grid.linkedin.com:9000/jobs/metrics</value>
+  </property>
+
+
+  <!-- /user/metrics - ViewFS -->
+  <property>
+    <name>fs.viewfs.mounttable.ltx1-holdem.link./user/metrics</name>
+    <value>hdfs://ltx1-holdemnn04.grid.linkedin.com:9000/user/metrics</value>
+  </property>
+
+
+  <!-- /tmp - ViewFS -->
+  <property>
+    <name>fs.viewfs.mounttable.ltx1-holdem.link./tmp</name>
+    <value>hdfs://ltx1-holdemnn01.grid.linkedin.com:9000/tmp</value>
+  </property>
+
+
+  <!-- /system - ViewFS -->
+  <property>
+    <name>fs.viewfs.mounttable.ltx1-holdem.link./system</name>
+    <value>hdfs://ltx1-holdemnn01.grid.linkedin.com:9000/system</value>
+  </property>
+
+
+  <!-- /share - ViewFS -->
+  <property>
+    <name>fs.viewfs.mounttable.ltx1-holdem.link./share</name>
+    <value>hdfs://ltx1-holdemnn01.grid.linkedin.com:9000/share</value>
+  </property>
+
+
+  <!-- /etl-silo - ViewFS -->
+  <property>
+    <name>fs.viewfs.mounttable.ltx1-holdem.link./etl-silo</name>
+    <value>hdfs://ltx1-holdemnn03.grid.linkedin.com:9000/etl-silo</value>
+  </property>
+
+
+  <!-- /ump-silo - ViewFS -->
+  <property>
+    <name>fs.viewfs.mounttable.ltx1-holdem.link./ump-silo</name>
+    <value>hdfs://ltx1-holdemnn04.grid.linkedin.com:9000/ump-silo</value>
+  </property>
+
+
+  <!-- /nn05-silo - ViewFS -->
+  <property>
+    <name>fs.viewfs.mounttable.ltx1-holdem.link./nn05-silo</name>
+    <value>hdfs://ltx1-holdemnn05.grid.linkedin.com:9000/nn05-silo</value>
+  </property>
+
+
+
+
+
+
+  <!-- This template file is specific to GridFileSystem which is used for federation -->
+  <property>
+    <name>fs.gridfs.impl</name>
+    <value>org.apache.hadoop.fs.GridFilesystem</value>
+  </property>
+  <property>
+    <name>fs.sgridfs.impl</name>
+    <value>org.apache.hadoop.fs.SecureGridFilesystem</value>
+  </property>
+  <property>
+    <name>fs.AbstractFileSystem.gridfs.impl</name>
+    <value>org.apache.hadoop.fs.GridFs</value>
+  </property>
+  <property>
+    <name>fs.AbstractFileSystem.sgridfs.impl</name>
+    <value>org.apache.hadoop.fs.GridFss</value>
+  </property>
+  <!-- This is temporary. This needs to be false by default in the code -->
+  <property>
+    <name>dali.emit.events</name>
+    <value>false</value>
+  </property>
+  <property>
+    <name>fs.viewfs.mounttable.default.name.key</name>
+    <value>ltx1-holdem</value>
+  </property>
+
+  <!-- BEGIN Client-side metrics -->
+  <!-- These are disabled by default and must be explicitly enabled by setting -->
+  <!-- fs.hdfs.impl=com.linkedin.hadoop.metrics.fs.HdfsPerformanceTrackingFileSystem -->
+  <!-- This is currently done in Azkaban. It can be moved here pending GRID-52202. -->
+
+  <property>
+    <name>fs.perf-tracking.kafka.fabric-group</name>
+    <value>CORP</value>
+  </property>
+  <property>
+    <name>fs.perf-tracking.kafka.cluster-name</name>
+    <value>metrics</value>
+  </property>
+  <property>
+    <name>fs.perf-tracking.kafka.metadata.topic-name</name>
+    <value>HadoopFileSystemMetadataRequestEvent</value>
+  </property>
+  <property>
+    <name>fs.perf-tracking.kafka.data.topic-name</name>
+    <value>HadoopFileSystemDataTransferEvent</value>
+  </property>
+  <!-- This config allows what percetage of azkaban flows will be using
+       PerformanceTrackingFileSystem. This config can also reside in Azkaban side
+       but its done here to reduce the dependency on the Azkaban side -->
+  <property>
+    <name>fs.perf-tracking.azkaban-flow-percent-enabled</name>
+    <value>100</value>
+  </property>
+
+  <!-- This tunes what percentage of requests to log to kafka for Dali HI logging. So, if this number is 0.04,
+       It's 0.04% -->
+  <property>
+    <name>fs.perf-tracking.dali-hi.sample-key</name>
+    <value>100</value>
+  </property>
+
+
+
+  <!-- END Client-side metrics -->
+
+
+  <!--
+    Always enable overload in failover. This doesn't take into effect if failoverfs:// is not used.
+  -->
+  <property>
+    <name>fs.failover.overload.scheme.target.hdfs.impl</name>
+    <value>org.apache.hadoop.fs.PerformanceTrackingDistributedFileSystem</value>
+  </property>
+
+  <property>
+    <name>fs.hdfs.impl</name>
+    <value>org.apache.hadoop.fs.GridFilesystem</value>
+  </property>
+  <property>
+    <name>fs.AbstractFileSystem.hdfs.impl</name>
+    <value>org.apache.hadoop.fs.GridFs</value>
+  </property>
+  <property>
+    <name>fs.viewfs.rename.strategy</name>
+    <value>SAME_FILESYSTEM_ACROSS_MOUNTPOINT</value>
+  </property>
+
+
+  <property>
+    <name>fs.viewfs.mounttable.default.fallback</name>
+    <value>hdfs://*:9000</value>
+  </property>
+
+
+  <property>
+    <name>fs.viewfs.overload.scheme.target.abstract.hdfs.impl</name>
+    <value>org.apache.hadoop.fs.Hdfs</value>
+  </property>
+  <property>
+    <name>abstractfs.failover.overload.scheme.target.hdfs.impl</name>
+    <value>org.apache.hadoop.fs.Hdfs</value>
+  </property>
+  <property>
+    <name>fs.viewfs.overload.scheme.target.hdfs.impl</name>
+    <value>org.apache.hadoop.fs.PerformanceTrackingDistributedFileSystem</value>
+  </property>
+
+
+  <!-- BEGIN /system -->
+  <property>
+    <name>fs.failover.impl</name>
+    <value>org.apache.hadoop.fs.viewfs.FailoverFileSystem</value>
+  </property>
+  <property>
+    <name>fs.AbstractFileSystem.failover.impl</name>
+    <value>org.apache.hadoop.fs.viewfs.FailoverFs</value>
+  </property>
+  <property>
+    <name>fs.failover.mounttable.system</name>
+    <value>hdfs://ltx1-holdemnn02.grid.linkedin.com:9000/system,hdfs://ltx1-holdemnn01.grid.linkedin.com:9000/system</value>
+  </property>
+  <property>
+    <name>fs.failover.mounttable.system.failover-mode</name>
+    <value>BACKUP_READS</value>
+  </property>
+  <!-- END /system -->
+
+  <!-- Additional FS impl(s) -->
+  <property>
+    <name>fs.abfs.impl</name>
+    <value>org.apache.hadoop.fs.azurebfs.AzureBlobFileSystem</value>
+  </property>
+  <property>
+    <name>fs.AbstractFileSystem.abfs.impl</name>
+    <value>org.apache.hadoop.fs.azurebfs.Abfs</value>
+  </property>
+  <property>
+    <name>fs.abfss.impl</name>
+    <value>org.apache.hadoop.fs.azurebfs.SecureAzureBlobFileSystem</value>
+  </property>
+  <property>
+    <name>fs.AbstractFileSystem.abfss.impl</name>
+    <value>org.apache.hadoop.fs.azurebfs.Abfss</value>
+  </property>
+  <property>
+    <name>fs.wasb.impl</name>
+    <value>org.apache.hadoop.fs.azure.NativeAzureFileSystem</value>
+  </property>
+  <property>
+    <name>fs.wasbs.impl</name>
+    <value>org.apache.hadoop.fs.azure.NativeAzureFileSystem$Secure</value>
+  </property>
+
+
+
+  <!-- ABFS driver related configurations required to move data to Azure -->
+
+  <property>
+    <name>fs.azure.write.max.concurrent.requests</name>
+    <value>4</value>
+  </property>
+
+  <property>
+    <name>fs.azure.write.max.requests.to.queue</name>
+    <value>12</value>
+  </property>
+
+  <property>
+    <name>fs.azure.delete.op.enable.rename</name>
+    <value>true</value>
+  </property>
+
+  <property>
+    <name>fs.azure.delete.op.enable.rename.trash.filesystem.name</name>
+    <value>trash</value>
+  </property>
+
+
 </configuration>

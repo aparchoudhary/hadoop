@@ -1851,10 +1851,10 @@ function hadoop_start_daemon_wrapper
   fi
 
   # shellcheck disable=SC2086
-  renice "${HADOOP_NICENESS}" $! >/dev/null 2>&1
-  if [[ $? -gt 0 ]]; then
-    hadoop_error "ERROR: Cannot set priority of ${daemonname} process $!"
-  fi
+#  renice "${HADOOP_NICENESS}" $! >/dev/null 2>&1
+#  if [[ $? -gt 0 ]]; then
+#    hadoop_error "ERROR: Cannot set priority of ${daemonname} process $!"
+#  fi
 
   # shellcheck disable=SC2086
   disown %+ >/dev/null 2>&1
@@ -2029,10 +2029,10 @@ function hadoop_start_secure_daemon_wrapper
 
   sleep 1
   #shellcheck disable=SC2086
-  renice "${HADOOP_NICENESS}" $! >/dev/null 2>&1
-  if [[ $? -gt 0 ]]; then
-    hadoop_error "ERROR: Cannot set priority of ${daemonname} process $!"
-  fi
+#  renice "${HADOOP_NICENESS}" $! >/dev/null 2>&1
+#  if [[ $? -gt 0 ]]; then
+#    hadoop_error "ERROR: Cannot set priority of ${daemonname} process $!"
+#  fi
   if [[ -f "${daemonpidfile}" ]]; then
     #shellcheck disable=SC2046
     renice "${HADOOP_NICENESS}" $(cat "${daemonpidfile}" 2>/dev/null) >/dev/null 2>&1

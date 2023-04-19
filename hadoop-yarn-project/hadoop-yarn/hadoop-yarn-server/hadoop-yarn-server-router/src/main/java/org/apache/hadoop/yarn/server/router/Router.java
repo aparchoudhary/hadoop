@@ -29,7 +29,10 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.source.JvmMetrics;
 import org.apache.hadoop.security.HttpCrossOriginFilterInitializer;
 import org.apache.hadoop.security.SecurityUtil;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.authorize.ProxyUsers;
 import org.apache.hadoop.service.CompositeService;
+import org.apache.hadoop.util.GenericOptionsParser;
 import org.apache.hadoop.util.JvmPauseMonitor;
 import org.apache.hadoop.util.ShutdownHookManager;
 import org.apache.hadoop.util.StringUtils;
@@ -100,6 +103,17 @@ public class Router extends CompositeService {
   @Override
   protected void serviceInit(Configuration config) throws Exception {
     this.conf = config;
+    
+    //This is only needed because in dynoyarn we haven't created a separate conf for router
+    conf.unset("yarn.resourcemanager.address");
+    conf.unset("yarn.resourcemanager.admin.address");
+    conf.set("yarn.federation.failover.enabled", "true");
+    //This is only needed because in dynoyarn we haven't created a separate conf for router
+
+    UserGroupInformation.setConfiguration(conf);
+
+    ProxyUsers.refreshSuperUserGroupsConfiguration(this.conf);
+    
     // ClientRM Proxy
     clientRMProxyService = createClientRMProxyService();
     addService(clientRMProxyService);
@@ -188,24 +202,25 @@ public class Router extends CompositeService {
   }
 
   public static void main(String[] argv) {
-    Configuration conf = new YarnConfiguration();
-    Thread
-        .setDefaultUncaughtExceptionHandler(new YarnUncaughtExceptionHandler());
-    StringUtils.startupShutdownMessage(Router.class, argv, LOG);
-    Router router = new Router();
     try {
-
-      // Remove the old hook if we are rebooting.
-      if (null != routerShutdownHook) {
-        ShutdownHookManager.get().removeShutdownHook(routerShutdownHook);
-      }
-
-      routerShutdownHook = new CompositeServiceShutdownHook(router);
-      ShutdownHookManager.get().addShutdownHook(routerShutdownHook,
-          SHUTDOWN_HOOK_PRIORITY);
-
-      router.init(conf);
-      router.start();
+      Configuration conf = new YarnConfiguration();
+      GenericOptionsParser hParser = new GenericOptionsParser(conf, argv);
+      Thread
+          .setDefaultUncaughtExceptionHandler(new YarnUncaughtExceptionHandler());
+      StringUtils.startupShutdownMessage(Router.class, argv, LOG);
+      Router router = new Router();
+  
+        // Remove the old hook if we are rebooting.
+        if (null != routerShutdownHook) {
+          ShutdownHookManager.get().removeShutdownHook(routerShutdownHook);
+        }
+  
+        routerShutdownHook = new CompositeServiceShutdownHook(router);
+        ShutdownHookManager.get().addShutdownHook(routerShutdownHook,
+            SHUTDOWN_HOOK_PRIORITY);
+  
+        router.init(conf);
+        router.start();
     } catch (Throwable t) {
       LOG.error("Error starting Router", t);
       System.exit(-1);

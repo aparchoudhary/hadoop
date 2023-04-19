@@ -325,9 +325,10 @@ public final class FederationStateStoreFacade {
   public SubClusterPolicyConfiguration getPolicyConfiguration(
       final String queue) throws YarnException {
     if (isCachingEnabled()) {
+      LOG.info("caching enabled");
       return getPoliciesConfigurations().get(queue);
     } else {
-
+      LOG.info("caching disabled" + stateStore);
       GetSubClusterPolicyConfigurationResponse response =
           stateStore.getPolicyConfiguration(
               GetSubClusterPolicyConfigurationRequest.newInstance(queue));

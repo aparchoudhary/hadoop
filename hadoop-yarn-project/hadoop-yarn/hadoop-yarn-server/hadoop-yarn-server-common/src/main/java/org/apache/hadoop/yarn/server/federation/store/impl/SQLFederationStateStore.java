@@ -22,8 +22,10 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.sql.CallableStatement;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -97,7 +99,6 @@ import org.apache.hadoop.yarn.util.MonotonicClock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.hadoop.classification.VisibleForTesting;
 import com.zaxxer.hikari.HikariDataSource;
 
 /**
@@ -126,7 +127,7 @@ public class SQLFederationStateStore implements FederationStateStore {
       "{call sp_subClusterHeartbeat(?, ?, ?, ?)}";
 
   private static final String CALL_SP_ADD_APPLICATION_HOME_SUBCLUSTER =
-      "{call sp_addApplicationHomeSubCluster(?, ?, ?, ?)}";
+      "{call sp_addApplicationHomeSubCluster(?, ?, ?, ?, ?)}";
 
   private static final String CALL_SP_UPDATE_APPLICATION_HOME_SUBCLUSTER =
       "{call sp_updateApplicationHomeSubCluster(?, ?, ?)}";
@@ -176,8 +177,6 @@ public class SQLFederationStateStore implements FederationStateStore {
   private int maximumPoolSize;
   private HikariDataSource dataSource = null;
   private final Clock clock = new MonotonicClock();
-  @VisibleForTesting
-  private Connection conn = null;
   private int maxAppsInStateStore;
 
   @Override
@@ -208,15 +207,8 @@ public class SQLFederationStateStore implements FederationStateStore {
     FederationStateStoreUtils.setProperty(dataSource,
         FederationStateStoreUtils.FEDERATION_STORE_URL, url);
     dataSource.setMaximumPoolSize(maximumPoolSize);
-    LOG.info("Initialized connection pool to the Federation StateStore database at address: {}.",
-        url);
-
-    try {
-      conn = getConnection();
-      LOG.debug("Connection created");
-    } catch (SQLException e) {
-      FederationStateStoreUtils.logAndThrowRetriableException(LOG, "Not able to get Connection", e);
-    }
+    LOG.info("Initialized connection pool to the Federation StateStore "
+        + "database at address: " + url);
 
     maxAppsInStateStore = conf.getInt(
         YarnConfiguration.FEDERATION_STATESTORE_MAX_APPLICATIONS,
@@ -231,12 +223,14 @@ public class SQLFederationStateStore implements FederationStateStore {
     FederationMembershipStateStoreInputValidator.validate(registerSubClusterRequest);
 
     CallableStatement cstmt = null;
+    Connection conn = null;
 
     SubClusterInfo subClusterInfo = registerSubClusterRequest.getSubClusterInfo();
     SubClusterId subClusterId = subClusterInfo.getSubClusterId();
 
     try {
-      cstmt = getCallableStatement(CALL_SP_REGISTER_SUBCLUSTER);
+      conn = getConnection();
+      cstmt = conn.prepareCall(CALL_SP_REGISTER_SUBCLUSTER);
 
       // Set the parameters for the stored procedure
       cstmt.setString("subClusterId_IN", subClusterId.getId());
@@ -277,10 +271,9 @@ public class SQLFederationStateStore implements FederationStateStore {
       FederationStateStoreUtils.logAndThrowRetriableException(e,
           LOG, "Unable to register the SubCluster %s into the StateStore.", subClusterId);
     } finally {
-      // Return to the pool the CallableStatement
-      FederationStateStoreUtils.returnToPool(LOG, cstmt);
+      // Return to the pool the CallableStatement and the Connection
+      FederationStateStoreUtils.returnToPool(LOG, cstmt, conn);
     }
-
     return SubClusterRegisterResponse.newInstance();
   }
 
@@ -292,12 +285,14 @@ public class SQLFederationStateStore implements FederationStateStore {
     FederationMembershipStateStoreInputValidator.validate(subClusterDeregisterRequest);
 
     CallableStatement cstmt = null;
+    Connection conn = null;
 
     SubClusterId subClusterId = subClusterDeregisterRequest.getSubClusterId();
     SubClusterState state = subClusterDeregisterRequest.getState();
 
     try {
-      cstmt = getCallableStatement(CALL_SP_DEREGISTER_SUBCLUSTER);
+      conn = getConnection();
+      cstmt = conn.prepareCall(CALL_SP_DEREGISTER_SUBCLUSTER);
 
       // Set the parameters for the stored procedure
       cstmt.setString("subClusterId_IN", subClusterId.getId());
@@ -331,8 +326,8 @@ public class SQLFederationStateStore implements FederationStateStore {
       FederationStateStoreUtils.logAndThrowRetriableException(e, LOG,
           "Unable to deregister the sub-cluster %s state to %s.", subClusterId, state.toString());
     } finally {
-      // Return to the pool the CallableStatement
-      FederationStateStoreUtils.returnToPool(LOG, cstmt);
+      // Return to the pool the CallableStatement and the Connection
+      FederationStateStoreUtils.returnToPool(LOG, cstmt, conn);
     }
     return SubClusterDeregisterResponse.newInstance();
   }
@@ -345,12 +340,14 @@ public class SQLFederationStateStore implements FederationStateStore {
     FederationMembershipStateStoreInputValidator.validate(subClusterHeartbeatRequest);
 
     CallableStatement cstmt = null;
+    Connection conn = null;
 
     SubClusterId subClusterId = subClusterHeartbeatRequest.getSubClusterId();
     SubClusterState state = subClusterHeartbeatRequest.getState();
 
     try {
-      cstmt = getCallableStatement(CALL_SP_SUBCLUSTER_HEARTBEAT);
+      conn = getConnection();
+      cstmt = conn.prepareCall(CALL_SP_SUBCLUSTER_HEARTBEAT);
 
       // Set the parameters for the stored procedure
       cstmt.setString("subClusterId_IN", subClusterId.getId());
@@ -385,8 +382,8 @@ public class SQLFederationStateStore implements FederationStateStore {
       FederationStateStoreUtils.logAndThrowRetriableException(e, LOG,
           "Unable to heartbeat the StateStore for the specified SubCluster %s.", subClusterId);
     } finally {
-      // Return to the pool the CallableStatement
-      FederationStateStoreUtils.returnToPool(LOG, cstmt);
+      // Return to the pool the CallableStatement and the Connection
+      FederationStateStoreUtils.returnToPool(LOG, cstmt, conn);
     }
     return SubClusterHeartbeatResponse.newInstance();
   }
@@ -399,12 +396,14 @@ public class SQLFederationStateStore implements FederationStateStore {
     FederationMembershipStateStoreInputValidator.validate(subClusterRequest);
 
     CallableStatement cstmt = null;
+    Connection conn = null;
 
     SubClusterInfo subClusterInfo = null;
     SubClusterId subClusterId = subClusterRequest.getSubClusterId();
 
     try {
-      cstmt = getCallableStatement(CALL_SP_GET_SUBCLUSTER);
+      conn = getConnection();
+      cstmt = conn.prepareCall(CALL_SP_GET_SUBCLUSTER);
       cstmt.setString("subClusterId_IN", subClusterId.getId());
 
       // Set the parameters for the stored procedure
@@ -459,8 +458,8 @@ public class SQLFederationStateStore implements FederationStateStore {
       FederationStateStoreUtils.logAndThrowRetriableException(e, LOG,
           "Unable to obtain the SubCluster information for %s.", subClusterId);
     } finally {
-      // Return to the pool the CallableStatement
-      FederationStateStoreUtils.returnToPool(LOG, cstmt);
+      // Return to the pool the CallableStatement and the Connection
+      FederationStateStoreUtils.returnToPool(LOG, cstmt, conn);
     }
     return GetSubClusterInfoResponse.newInstance(subClusterInfo);
   }
@@ -468,17 +467,23 @@ public class SQLFederationStateStore implements FederationStateStore {
   @Override
   public GetSubClustersInfoResponse getSubClusters(
       GetSubClustersInfoRequest subClustersRequest) throws YarnException {
+    Connection conn = null;
     CallableStatement cstmt = null;
     ResultSet rs = null;
     List<SubClusterInfo> subClusters = new ArrayList<>();
 
     try {
-      cstmt = getCallableStatement(CALL_SP_GET_SUBCLUSTERS);
+      conn = getConnection();
+      cstmt = conn.prepareCall(CALL_SP_GET_SUBCLUSTERS);
 
       // Execute the query
       long startTime = clock.getTime();
       rs = cstmt.executeQuery();
       long stopTime = clock.getTime();
+      
+      long time2 = stopTime - startTime;
+
+      LOG.info("check time for get subclusters execute query " + time2);
 
       while (rs.next()) {
 
@@ -521,8 +526,8 @@ public class SQLFederationStateStore implements FederationStateStore {
       FederationStateStoreUtils.logAndThrowRetriableException(LOG,
           "Unable to obtain the information for all the SubClusters ", e);
     } finally {
-      // Return to the pool the CallableStatement
-      FederationStateStoreUtils.returnToPool(LOG, cstmt, null, rs);
+      // Return to the pool the CallableStatement and the Connection
+      FederationStateStoreUtils.returnToPool(LOG, cstmt, conn, rs);
     }
     return GetSubClustersInfoResponse.newInstance(subClusters);
   }
@@ -533,6 +538,8 @@ public class SQLFederationStateStore implements FederationStateStore {
 
     // Input validator
     FederationApplicationHomeSubClusterStoreInputValidator.validate(request);
+    
+    Connection conn = null;
 
     CallableStatement cstmt = null;
 
@@ -543,11 +550,13 @@ public class SQLFederationStateStore implements FederationStateStore {
         request.getApplicationHomeSubCluster().getHomeSubCluster();
 
     try {
-      cstmt = getCallableStatement(CALL_SP_ADD_APPLICATION_HOME_SUBCLUSTER);
+      conn = getConnection();
+      cstmt = conn.prepareCall(CALL_SP_ADD_APPLICATION_HOME_SUBCLUSTER);
 
       // Set the parameters for the stored procedure
       cstmt.setString("applicationId_IN", appId.toString());
       cstmt.setString("homeSubCluster_IN", subClusterId.getId());
+      cstmt.setString("epochDate_IN", String.valueOf(System.currentTimeMillis()));
       cstmt.registerOutParameter("storedHomeSubCluster_OUT", java.sql.Types.VARCHAR);
       cstmt.registerOutParameter("rowCount_OUT", java.sql.Types.INTEGER);
 
@@ -597,8 +606,8 @@ public class SQLFederationStateStore implements FederationStateStore {
       FederationStateStoreUtils.logAndThrowRetriableException(e, LOG,
           "Unable to insert the newly generated application %s.", appId);
     } finally {
-      // Return to the pool the CallableStatement
-      FederationStateStoreUtils.returnToPool(LOG, cstmt);
+      // Return to the pool the CallableStatement and the Connection
+      FederationStateStoreUtils.returnToPool(LOG, cstmt, conn);
     }
 
     return AddApplicationHomeSubClusterResponse
@@ -613,6 +622,7 @@ public class SQLFederationStateStore implements FederationStateStore {
     FederationApplicationHomeSubClusterStoreInputValidator.validate(request);
 
     CallableStatement cstmt = null;
+    Connection conn = null;
 
     ApplicationId appId =
         request.getApplicationHomeSubCluster().getApplicationId();
@@ -620,7 +630,8 @@ public class SQLFederationStateStore implements FederationStateStore {
         request.getApplicationHomeSubCluster().getHomeSubCluster();
 
     try {
-      cstmt = getCallableStatement(CALL_SP_UPDATE_APPLICATION_HOME_SUBCLUSTER);
+      conn = getConnection();
+      cstmt = conn.prepareCall(CALL_SP_UPDATE_APPLICATION_HOME_SUBCLUSTER);
 
       // Set the parameters for the stored procedure
       cstmt.setString("applicationId_IN", appId.toString());
@@ -654,8 +665,8 @@ public class SQLFederationStateStore implements FederationStateStore {
       FederationStateStoreUtils.logAndThrowRetriableException(e, LOG,
           "Unable to update the application %s.", appId);
     } finally {
-      // Return to the pool the CallableStatement
-      FederationStateStoreUtils.returnToPool(LOG, cstmt);
+      // Return to the pool the CallableStatement and the Connection
+      FederationStateStoreUtils.returnToPool(LOG, cstmt, conn);
     }
     return UpdateApplicationHomeSubClusterResponse.newInstance();
   }
@@ -665,26 +676,29 @@ public class SQLFederationStateStore implements FederationStateStore {
       GetApplicationHomeSubClusterRequest request) throws YarnException {
     // Input validator
     FederationApplicationHomeSubClusterStoreInputValidator.validate(request);
+    Connection conn = null;
 
-    CallableStatement cstmt = null;
+    Statement cstmt = null;
 
     SubClusterId homeRM = null;
 
     ApplicationId applicationId = request.getApplicationId();
-
+    ResultSet resultSet = null;
     try {
-      cstmt = getCallableStatement(CALL_SP_GET_APPLICATION_HOME_SUBCLUSTER);
+      conn = getConnection();
+      cstmt =  conn.createStatement();
+      long startTime = clock.getTime();
+      String query = "SELECT subClusterId   FROM applicationsHomeSubCluster WHERE applicationId = +'" + applicationId + "'";
+      resultSet = cstmt.executeQuery(query);
 
       // Set the parameters for the stored procedure
-      cstmt.setString("applicationId_IN", applicationId.toString());
-      cstmt.registerOutParameter("homeSubCluster_OUT", java.sql.Types.VARCHAR);
+      long stopTime = clock.getTime();
+      String homeSubCluster = null;
+      while (resultSet.next()) {
+        homeSubCluster = resultSet.getString("subClusterId");
+      }
 
       // Execute the query
-      long startTime = clock.getTime();
-      cstmt.execute();
-      long stopTime = clock.getTime();
-
-      String homeSubCluster = cstmt.getString("homeSubCluster_OUT");
       if (homeSubCluster != null) {
         homeRM = SubClusterId.newInstance(homeSubCluster);
       } else {
@@ -703,8 +717,9 @@ public class SQLFederationStateStore implements FederationStateStore {
           "Unable to obtain the application information for the specified application %s.",
           applicationId);
     } finally {
-      // Return to the pool the CallableStatement
-      FederationStateStoreUtils.returnToPool(LOG, cstmt);
+
+      // Return to the pool the CallableStatement and the Connection
+      FederationStateStoreUtils.returnToPool(LOG, cstmt, conn, resultSet);
     }
     return GetApplicationHomeSubClusterResponse.newInstance(request.getApplicationId(), homeRM);
   }
@@ -718,11 +733,13 @@ public class SQLFederationStateStore implements FederationStateStore {
     }
 
     CallableStatement cstmt = null;
+    Connection conn = null;
     ResultSet rs = null;
     List<ApplicationHomeSubCluster> appsHomeSubClusters = new ArrayList<>();
 
     try {
-      cstmt = getCallableStatement(CALL_SP_GET_APPLICATIONS_HOME_SUBCLUSTER);
+      conn = getConnection();
+      cstmt = conn.prepareCall(CALL_SP_GET_APPLICATIONS_HOME_SUBCLUSTER);
       cstmt.setInt("limit_IN", maxAppsInStateStore);
       String homeSubClusterIN = StringUtils.EMPTY;
       SubClusterId subClusterId = request.getSubClusterId();
@@ -754,8 +771,8 @@ public class SQLFederationStateStore implements FederationStateStore {
       FederationStateStoreUtils.logAndThrowRetriableException(LOG,
           "Unable to obtain the information for all the applications ", e);
     } finally {
-      // Return to the pool the CallableStatement
-      FederationStateStoreUtils.returnToPool(LOG, cstmt, null, rs);
+      // Return to the pool the CallableStatement and the Connection
+      FederationStateStoreUtils.returnToPool(LOG, cstmt, conn, rs);
     }
 
     return GetApplicationsHomeSubClusterResponse.newInstance(appsHomeSubClusters);
@@ -768,10 +785,13 @@ public class SQLFederationStateStore implements FederationStateStore {
     // Input validator
     FederationApplicationHomeSubClusterStoreInputValidator.validate(request);
 
+    Connection conn = null;
     CallableStatement cstmt = null;
     ApplicationId applicationId = request.getApplicationId();
+    
     try {
-      cstmt = getCallableStatement(CALL_SP_DELETE_APPLICATION_HOME_SUBCLUSTER);
+      conn = getConnection();
+      cstmt = conn.prepareCall(CALL_SP_DELETE_APPLICATION_HOME_SUBCLUSTER);
 
       // Set the parameters for the stored procedure
       cstmt.setString("applicationId_IN", applicationId.toString());
@@ -804,8 +824,8 @@ public class SQLFederationStateStore implements FederationStateStore {
       FederationStateStoreUtils.logAndThrowRetriableException(e, LOG,
           "Unable to delete the application %s.", applicationId);
     } finally {
-      // Return to the pool the CallableStatement
-      FederationStateStoreUtils.returnToPool(LOG, cstmt);
+      // Return to the pool the CallableStatement and the Connection
+      FederationStateStoreUtils.returnToPool(LOG, cstmt, conn);
     }
     return DeleteApplicationHomeSubClusterResponse.newInstance();
   }
@@ -816,12 +836,13 @@ public class SQLFederationStateStore implements FederationStateStore {
 
     // Input validator
     FederationPolicyStoreInputValidator.validate(request);
-
+    Connection conn = null;
     CallableStatement cstmt = null;
     SubClusterPolicyConfiguration subClusterPolicyConfiguration = null;
 
     try {
-      cstmt = getCallableStatement(CALL_SP_GET_POLICY_CONFIGURATION);
+      conn = getConnection();
+      cstmt = conn.prepareCall(CALL_SP_GET_POLICY_CONFIGURATION);
 
       // Set the parameters for the stored procedure
       cstmt.setString("queue_IN", request.getQueue());
@@ -853,8 +874,8 @@ public class SQLFederationStateStore implements FederationStateStore {
       FederationStateStoreUtils.logAndThrowRetriableException(e, LOG,
           "Unable to select the policy for the queue : %s." + request.getQueue());
     } finally {
-      // Return to the pool the CallableStatement
-      FederationStateStoreUtils.returnToPool(LOG, cstmt);
+      // Return to the pool the CallableStatement and the Connection
+      FederationStateStoreUtils.returnToPool(LOG, cstmt, conn);
     }
     return GetSubClusterPolicyConfigurationResponse.newInstance(subClusterPolicyConfiguration);
   }
@@ -867,11 +888,13 @@ public class SQLFederationStateStore implements FederationStateStore {
     FederationPolicyStoreInputValidator.validate(request);
 
     CallableStatement cstmt = null;
+    Connection conn = null;
 
     SubClusterPolicyConfiguration policyConf = request.getPolicyConfiguration();
 
     try {
-      cstmt = getCallableStatement(CALL_SP_SET_POLICY_CONFIGURATION);
+      conn = getConnection();
+      cstmt = conn.prepareCall(CALL_SP_SET_POLICY_CONFIGURATION);
 
       // Set the parameters for the stored procedure
       cstmt.setString("queue_IN", policyConf.getQueue());
@@ -906,8 +929,8 @@ public class SQLFederationStateStore implements FederationStateStore {
       FederationStateStoreUtils.logAndThrowRetriableException(e, LOG,
           "Unable to insert the newly generated policy for the queue : %s.", policyConf.getQueue());
     } finally {
-      // Return to the pool the CallableStatement
-      FederationStateStoreUtils.returnToPool(LOG, cstmt);
+      // Return to the pool the CallableStatement and the Connection
+      FederationStateStoreUtils.returnToPool(LOG, cstmt, conn);
     }
     return SetSubClusterPolicyConfigurationResponse.newInstance();
   }
@@ -917,11 +940,13 @@ public class SQLFederationStateStore implements FederationStateStore {
       GetSubClusterPoliciesConfigurationsRequest request) throws YarnException {
 
     CallableStatement cstmt = null;
+    Connection conn = null;
     ResultSet rs = null;
     List<SubClusterPolicyConfiguration> policyConfigurations = new ArrayList<>();
 
     try {
-      cstmt = getCallableStatement(CALL_SP_GET_POLICIES_CONFIGURATIONS);
+      conn = getConnection();
+      cstmt = conn.prepareCall(CALL_SP_GET_POLICIES_CONFIGURATIONS);
 
       // Execute the query
       long startTime = clock.getTime();
@@ -946,8 +971,8 @@ public class SQLFederationStateStore implements FederationStateStore {
       FederationStateStoreUtils.logAndThrowRetriableException(LOG,
           "Unable to obtain the policy information for all the queues.", e);
     } finally {
-      // Return to the pool the CallableStatement
-      FederationStateStoreUtils.returnToPool(LOG, cstmt, null, rs);
+      // Return to the pool the CallableStatement and the Connection
+      FederationStateStoreUtils.returnToPool(LOG, cstmt, conn, rs);
     }
 
     return GetSubClusterPoliciesConfigurationsResponse.newInstance(policyConfigurations);
@@ -967,8 +992,6 @@ public class SQLFederationStateStore implements FederationStateStore {
   public void close() throws Exception {
     if (dataSource != null) {
       dataSource.close();
-      LOG.debug("Connection closed");
-      FederationStateStoreClientMetrics.decrConnections();
     }
   }
 
@@ -978,18 +1001,12 @@ public class SQLFederationStateStore implements FederationStateStore {
    * @return a connection from the DataSource pool.
    * @throws SQLException on failure
    */
-  @VisibleForTesting
-  protected Connection getConnection() throws SQLException {
+
+  public Connection getConnection() throws SQLException {
     FederationStateStoreClientMetrics.incrConnections();
     return dataSource.getConnection();
   }
-
-  @VisibleForTesting
-  protected CallableStatement getCallableStatement(String procedure)
-      throws SQLException {
-    return conn.prepareCall(procedure);
-  }
-
+  
   private static byte[] getByteArray(ByteBuffer bb) {
     byte[] ba = new byte[bb.limit()];
     bb.get(ba);
@@ -1002,6 +1019,7 @@ public class SQLFederationStateStore implements FederationStateStore {
 
     // validate
     FederationReservationHomeSubClusterStoreInputValidator.validate(request);
+    Connection conn = null;
     CallableStatement cstmt = null;
 
     ReservationHomeSubCluster reservationHomeSubCluster = request.getReservationHomeSubCluster();
@@ -1021,7 +1039,8 @@ public class SQLFederationStateStore implements FederationStateStore {
       // 4）OUT rowCount_OUT int
 
       // Call procedure
-      cstmt = getCallableStatement(CALL_SP_ADD_RESERVATION_HOME_SUBCLUSTER);
+      conn = getConnection();
+      cstmt = conn.prepareCall(CALL_SP_ADD_RESERVATION_HOME_SUBCLUSTER);
 
       // Set the parameters for the stored procedure
       // 1）IN reservationId_IN varchar(128)
@@ -1088,7 +1107,7 @@ public class SQLFederationStateStore implements FederationStateStore {
           reservationId, subClusterId);
     } finally {
       // Return to the pool the CallableStatement
-      FederationStateStoreUtils.returnToPool(LOG, cstmt);
+      FederationStateStoreUtils.returnToPool(LOG, cstmt, conn);
     }
 
     return AddReservationHomeSubClusterResponse.newInstance(subClusterHomeId);
@@ -1100,6 +1119,7 @@ public class SQLFederationStateStore implements FederationStateStore {
     // validate
     FederationReservationHomeSubClusterStoreInputValidator.validate(request);
 
+    Connection conn = null;
     CallableStatement cstmt = null;
     ReservationId reservationId = request.getReservationId();
     SubClusterId subClusterId = null;
@@ -1113,7 +1133,8 @@ public class SQLFederationStateStore implements FederationStateStore {
       // Output parameters
       // 2）OUT homeSubCluster_OUT varchar(256)
 
-      cstmt = getCallableStatement(CALL_SP_GET_RESERVATION_HOME_SUBCLUSTER);
+      conn = getConnection();
+      cstmt = conn.prepareCall(CALL_SP_GET_RESERVATION_HOME_SUBCLUSTER);
 
       // Set the parameters for the stored procedure
       // 1）IN reservationId_IN varchar(128)
@@ -1152,7 +1173,7 @@ public class SQLFederationStateStore implements FederationStateStore {
           "Unable to obtain the reservation information according to %s.", reservationId);
     } finally {
       // Return to the pool the CallableStatement
-      FederationStateStoreUtils.returnToPool(LOG, cstmt);
+      FederationStateStoreUtils.returnToPool(LOG, cstmt, conn);
     }
 
     throw new YarnException(
@@ -1162,6 +1183,7 @@ public class SQLFederationStateStore implements FederationStateStore {
   @Override
   public GetReservationsHomeSubClusterResponse getReservationsHomeSubCluster(
       GetReservationsHomeSubClusterRequest request) throws YarnException {
+    Connection conn = null;
     CallableStatement cstmt = null;
     ResultSet rs = null;
     List<ReservationHomeSubCluster> reservationsHomeSubClusters = new ArrayList<>();
@@ -1174,7 +1196,8 @@ public class SQLFederationStateStore implements FederationStateStore {
       // 1）OUT reservationId
       // 2）OUT homeSubCluster
 
-      cstmt = getCallableStatement(CALL_SP_GET_RESERVATIONS_HOME_SUBCLUSTER);
+      conn = getConnection();
+      cstmt = conn.prepareCall(CALL_SP_GET_RESERVATIONS_HOME_SUBCLUSTER);
 
       // Execute the query
       long startTime = clock.getTime();
@@ -1206,7 +1229,7 @@ public class SQLFederationStateStore implements FederationStateStore {
           "Unable to obtain the information for all the reservations.", e);
     } finally {
       // Return to the pool the CallableStatement
-      FederationStateStoreUtils.returnToPool(LOG, cstmt, null, rs);
+      FederationStateStoreUtils.returnToPool(LOG, cstmt, conn, rs);
     }
 
     throw new YarnException("Unable to obtain the information for all the reservations.");
@@ -1218,7 +1241,8 @@ public class SQLFederationStateStore implements FederationStateStore {
 
     // validate
     FederationReservationHomeSubClusterStoreInputValidator.validate(request);
-
+    
+    Connection conn = null;
     CallableStatement cstmt = null;
     ReservationId reservationId = request.getReservationId();
 
@@ -1231,7 +1255,8 @@ public class SQLFederationStateStore implements FederationStateStore {
       // Output parameters
       // 2）OUT rowCount_OUT int
 
-      cstmt = getCallableStatement(CALL_SP_DELETE_RESERVATION_HOME_SUBCLUSTER);
+      conn = getConnection();
+      cstmt = conn.prepareCall(CALL_SP_DELETE_RESERVATION_HOME_SUBCLUSTER);
 
       // Set the parameters for the stored procedure
       // 1）IN reservationId_IN varchar(128)
@@ -1271,7 +1296,7 @@ public class SQLFederationStateStore implements FederationStateStore {
           "Unable to delete the reservation %s.", reservationId);
     } finally {
       // Return to the pool the CallableStatement
-      FederationStateStoreUtils.returnToPool(LOG, cstmt);
+      FederationStateStoreUtils.returnToPool(LOG, cstmt, conn);
     }
     throw new YarnException("Unable to delete the reservation " + reservationId);
   }
@@ -1283,6 +1308,7 @@ public class SQLFederationStateStore implements FederationStateStore {
     // validate
     FederationReservationHomeSubClusterStoreInputValidator.validate(request);
 
+    Connection conn = null;
     CallableStatement cstmt = null;
     ReservationHomeSubCluster reservationHomeSubCluster = request.getReservationHomeSubCluster();
     ReservationId reservationId = reservationHomeSubCluster.getReservationId();
@@ -1298,7 +1324,8 @@ public class SQLFederationStateStore implements FederationStateStore {
       // Output parameters
       // 3）OUT rowCount_OUT int
 
-      cstmt = getCallableStatement(CALL_SP_UPDATE_RESERVATION_HOME_SUBCLUSTER);
+      conn = getConnection();
+      cstmt = conn.prepareCall(CALL_SP_UPDATE_RESERVATION_HOME_SUBCLUSTER);
 
       // Set the parameters for the stored procedure
       // 1）IN reservationId_IN varchar(128)
@@ -1341,17 +1368,13 @@ public class SQLFederationStateStore implements FederationStateStore {
           subClusterId, reservationId);
     } finally {
       // Return to the pool the CallableStatement
-      FederationStateStoreUtils.returnToPool(LOG, cstmt);
+      FederationStateStoreUtils.returnToPool(LOG, cstmt, conn);
     }
     throw new YarnException(
         "Unable to update the subCluster " + subClusterId +
         " according to reservation" + reservationId);
   }
-
-  @VisibleForTesting
-  public Connection getConn() {
-    return conn;
-  }
+  
 
   @Override
   public RouterMasterKeyResponse storeNewMasterKey(RouterMasterKeyRequest request)

@@ -119,6 +119,7 @@ import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ApplicationSubmissionContext;
 import org.apache.hadoop.yarn.api.records.ReservationId;
 import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.yarn.server.federation.store.FederationStateStore;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
@@ -146,6 +147,7 @@ import org.slf4j.LoggerFactory;
 
 import org.apache.hadoop.classification.VisibleForTesting;
 
+import static org.apache.hadoop.yarn.server.federation.utils.FederationStateStoreFacade.*;
 import static org.apache.hadoop.yarn.server.router.RouterAuditLogger.AuditConstants.GET_NEW_APP;
 import static org.apache.hadoop.yarn.server.router.RouterAuditLogger.AuditConstants.SUBMIT_NEW_APP;
 import static org.apache.hadoop.yarn.server.router.RouterAuditLogger.AuditConstants.GET_APP_REPORT;
@@ -184,6 +186,23 @@ public class FederationClientInterceptor
   private final Clock clock = new MonotonicClock();
   private boolean returnPartialReport;
   private long submitIntervalTime;
+  
+  private static  FederationStateStore stateStore;
+  
+  private static synchronized FederationStateStore getFederationStateStore(Configuration conf) {
+    if(stateStore == null) {
+      try {
+        stateStore = (FederationStateStore) FederationStateStoreFacade.createRetryInstance(conf, YarnConfiguration.FEDERATION_STATESTORE_CLIENT_CLASS,
+            YarnConfiguration.DEFAULT_FEDERATION_STATESTORE_CLIENT_CLASS, FederationStateStore.class, createRetryPolicy(conf));
+        stateStore.init(conf);
+    } catch (YarnException ex) {
+      LOG.error("Failed to initialize the FederationStateStoreFacade object",
+          ex);
+      throw new RuntimeException(ex);
+    }
+    }
+    return stateStore;
+  }
 
   @Override
   public void init(String userName) {
@@ -208,6 +227,7 @@ public class FederationClientInterceptor
         keepAliveTime, TimeUnit.MILLISECONDS, workQueue, threadFactory);
 
     final Configuration conf = this.getConf();
+    federationFacade.reinitialize(getFederationStateStore(conf), conf);
 
     try {
       policyFacade = new RouterPolicyFacade(conf, federationFacade,
@@ -357,6 +377,7 @@ public class FederationClientInterceptor
     SubClusterId subClusterId =
         federationFacade.getRandomActiveSubCluster(subClustersActive, blackList);
     LOG.info("getNewApplication try #{} on SubCluster {}.", retryCount, subClusterId);
+    LOG.info("check" + getConf().get("yarn.resourcemanager.address"));
     ApplicationClientProtocol clientRMProxy = getClientRMProxyForSubCluster(subClusterId);
     try {
       GetNewApplicationResponse response = clientRMProxy.getNewApplication(request);
@@ -531,19 +552,43 @@ public class FederationClientInterceptor
 
     try {
 
+      long startTime1 = clock.getTime();
+
       // Step1. Select homeSubCluster for Application according to Policy.
       subClusterId = policyFacade.getHomeSubcluster(appSubmissionContext, blackList);
       LOG.info("submitApplication appId {} try #{} on SubCluster {}.",
           applicationId, retryCount, subClusterId);
+
+      long stopTime1 = clock.getTime();
+      
+      long time1 = stopTime1 - startTime1;
+      
+      LOG.info("time taken in step 1" + time1);
+
+      long startTime2 = clock.getTime();
 
       // Step2. We Store the mapping relationship
       // between Application and HomeSubCluster in stateStore.
       federationFacade.addOrUpdateApplicationHomeSubCluster(
           applicationId, subClusterId, retryCount);
 
+      long stopTime2 = clock.getTime();
+
+      long time2 = stopTime2 - startTime2;
+
+      LOG.info("time taken in step 2" + time2);
+
+      long startTime3 = clock.getTime();
+
       // Step3. SubmitApplication to the subCluster
       ApplicationClientProtocol clientRMProxy = getClientRMProxyForSubCluster(subClusterId);
       SubmitApplicationResponse response = clientRMProxy.submitApplication(request);
+
+      long stopTime3 = clock.getTime();
+
+      long time3 = stopTime3 - startTime3;
+
+      LOG.info("time taken in step 3" + time3);
 
       // Step4. if SubmitApplicationResponse is not empty, the request is successful.
       if (response != null) {

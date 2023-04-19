@@ -23,6 +23,7 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
+import java.sql.Statement;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.server.federation.store.exception.FederationStateStoreException;
 import org.apache.hadoop.yarn.server.federation.store.exception.FederationStateStoreInvalidInputException;
@@ -88,6 +89,37 @@ public final class FederationStateStoreUtils {
     }
   }
 
+  public static void returnToPool(Logger log, Statement cstmt,
+      Connection conn, ResultSet rs) throws YarnException {
+    if (cstmt != null) {
+      try {
+        cstmt.close();
+      } catch (SQLException e) {
+        logAndThrowException(log, "Exception while trying to close Statement",
+            e);
+      }
+    }
+
+    if (conn != null) {
+      try {
+        conn.close();
+        FederationStateStoreClientMetrics.decrConnections();
+      } catch (SQLException e) {
+        logAndThrowException(log, "Exception while trying to close Connection",
+            e);
+      }
+    }
+
+    if (rs != null) {
+      try {
+        rs.close();
+      } catch (SQLException e) {
+        logAndThrowException(log, "Exception while trying to close ResultSet",
+            e);
+      }
+    }
+  }
+
   /**
    * Returns the SQL <code>FederationStateStore</code> connections to the pool.
    *
@@ -99,18 +131,6 @@ public final class FederationStateStoreUtils {
   public static void returnToPool(Logger log, CallableStatement cstmt,
       Connection conn) throws YarnException {
     returnToPool(log, cstmt, conn, null);
-  }
-
-  /**
-   * Returns the SQL <code>FederationStateStore</code> connections to the pool.
-   *
-   * @param log the logger interface
-   * @param cstmt the interface used to execute SQL stored procedures
-   * @throws YarnException on failure
-   */
-  public static void returnToPool(Logger log, CallableStatement cstmt)
-      throws YarnException {
-    returnToPool(log, cstmt, null);
   }
 
   /**

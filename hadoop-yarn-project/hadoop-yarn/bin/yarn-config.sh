@@ -24,14 +24,6 @@ function hadoop_subproject_init
   # ...
   # this should get deprecated at some point.
 
-  if [[ -z "${HADOOP_YARN_ENV_PROCESSED}" ]]; then
-    if [[ -e "${YARN_CONF_DIR}/yarn-env.sh" ]]; then
-      . "${YARN_CONF_DIR}/yarn-env.sh"
-    elif [[ -e "${HADOOP_CONF_DIR}/yarn-env.sh" ]]; then
-      . "${HADOOP_CONF_DIR}/yarn-env.sh"
-    fi
-    export HADOOP_YARN_ENV_PROCESSED=true
-  fi
 
   hadoop_deprecate_envvar YARN_CONF_DIR HADOOP_CONF_DIR
 
@@ -62,6 +54,15 @@ function hadoop_subproject_init
   hadoop_deprecate_envvar YARN_USER_CLASSPATH HADOOP_CLASSPATH
 
   hadoop_deprecate_envvar YARN_USER_CLASSPATH_FIRST HADOOP_USER_CLASSPATH_FIRST
+  
+  if [[ -z "${HADOOP_YARN_ENV_PROCESSED}" ]]; then
+    if [[ -e "${YARN_CONF_DIR}/yarn-env.sh" ]]; then
+      . "${YARN_CONF_DIR}/yarn-env.sh"
+    elif [[ -e "${HADOOP_CONF_DIR}/yarn-env.sh" ]]; then
+      . "${HADOOP_CONF_DIR}/yarn-env.sh"
+    fi
+    export HADOOP_YARN_ENV_PROCESSED=true
+  fi
 }
 
 if [[ -z "${HADOOP_LIBEXEC_DIR}" ]]; then
